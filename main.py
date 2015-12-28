@@ -83,7 +83,7 @@ def main():
         f = s.makefile()
         while True:
             line = f.readline()
-            print(line, file=open('log', 'a'))
+            print(repr(line), file=open('log', 'a'))
             response = delegate(line)
             if response:
                 print(">>>>> {}".format(response), file=open('log', 'a'))
