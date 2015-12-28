@@ -69,12 +69,15 @@ def main():
 
     s = socket.socket()
     try:
-        s.connect((config['server'], config['port']))
+        s.connect((config['server'], config.getint('port')))
         s.send('USER {} . . :{}\r\n'
                .format(config['username'], config['realname'])
                .encode())
         s.send('NICK {}\r\n'
                .format(config['nickname'])
+               .encode())
+        s.send('JOIN {}\r\n'
+               .format(config['channel'])
                .encode())
 
         f = s.makefile()
