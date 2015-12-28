@@ -15,14 +15,7 @@ def handle_ping(msg):
     return 'PONG {}'.format(' '.join(msg.args))
 
 
-def handle_notice(msg):
-    """Play ping-pong.
-    """
-    print(msg)
-
-
-callback = {'PING': handle_ping,
-            'NOTICE': handle_notice
+callback = {'PING': handle_ping
            }
 
 
