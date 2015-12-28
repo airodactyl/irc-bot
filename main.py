@@ -2,20 +2,50 @@
 """
 
 import socket
+import re
 from pprint import pprint
 from configparser import ConfigParser
 from collections import namedtuple
 
 IRCMessage = namedtuple('IRCMessage', ['prefix', 'command', 'args'])
+MessageHandler = namedtuple('MessageHandler', ['pattern', 'callback'])
+
+
+message_handlers = []  #: list of MessageHandler objects
 
 
 def handle_ping(msg):
     """Play ping-pong.
     """
-    return 'PONG {}'.format(' '.join(msg.args))
+    return ['PONG ' + msg.args]
 
 
-callback = {'PING': handle_ping
+def connect_to_channels(_):
+    """Connect to the channels after the MOTD has been sent.
+    """
+    response = []
+    for channel in config['channel'].split(','):
+        channel = channel.strip()
+        response.append('JOIN ' + config['channel'])
+    return response
+
+
+def handle_privmsg(msg):
+    """React to the message.
+    """
+    response = []
+    target, contents = msg.args.split(' ', 1)
+    if contents[0] == ':':
+        contents = contents[1:]
+    for handler in message_handlers:
+        if re.match(handler.pattern, contents):
+            response.append(handler.callback(contents))
+    return response
+
+
+callback = {'PING': handle_ping,
+            '376': connect_to_channels,
+            'PRIVMSG': handle_privmsg
            }
 
 
@@ -38,7 +68,7 @@ def parse_msg(message):
     command = pipeline.pop(0)
 
     if pipeline:
-        args = pipeline
+        args = pipeline.pop(0)
 
     return IRCMessage(prefix, command, args)
 
@@ -50,16 +80,12 @@ def delegate(text):
     try:
         return callback[response.command](response)
     except KeyError:
-        return
+        return []
 
 
 def main():
     """Main
     """
-    config = ConfigParser()
-    config.read('config.ini')
-    config = config[config.sections()[0]]
-
     s = socket.socket()
     try:
         s.connect((config['server'], config.getint('port')))
@@ -69,18 +95,16 @@ def main():
         s.send('NICK {}\r\n'
                .format(config['nickname'])
                .encode())
-        s.send('JOIN {}\r\n'
-               .format(config['channel'])
-               .encode())
 
         f = s.makefile()
         while True:
             line = f.readline()
             print(repr(line), file=open('log', 'a'))
-            response = delegate(line)
-            if response:
-                print(">>>>> {}".format(response), file=open('log', 'a'))
-                s.send((response + '\r\n').encode())
+            responses = delegate(line)
+            if responses:
+                for response in responses:
+                    print(">>>>> {}".format(response), file=open('log', 'a'))
+                    s.send((response + '\r\n').encode())
 
     except KeyboardInterrupt:
         s.send('QUIT :bye\r\n'.encode())
@@ -89,4 +113,8 @@ def main():
 
 
 if __name__ == '__main__':
+    config = ConfigParser()
+    config.read('config.ini')
+    config = config[config.sections()[0]]
+
     main()
