@@ -1,0 +1,9 @@
+rizon:
+    server: irc.rizon.net
+    port: 6667
+    username: Guest
+    realname: Guest
+    nickname: Guest
+    channels:
+        - name: "#HorribleSubs"
+          plugins: []

@@ -4,8 +4,9 @@
 import socket
 import re
 from pprint import pprint
-from configparser import ConfigParser
 from collections import namedtuple
+
+import config
 
 IRCMessage = namedtuple('IRCMessage', ['prefix', 'command', 'args'])
 MessageHandler = namedtuple('MessageHandler', ['pattern', 'callback'])
@@ -24,9 +25,8 @@ def connect_to_channels(_):
     """Connect to the channels after the MOTD has been sent.
     """
     response = []
-    for channel in config['channel'].split(','):
-        channel = channel.strip()
-        response.append('JOIN ' + config['channel'])
+    for channel in config['channels']:
+        response.append('JOIN ' + channel['name'])
     return response
 
 
@@ -43,9 +43,18 @@ def handle_privmsg(msg):
     return response
 
 
+def handle_auth(_):
+    """Handle notices.
+    """
+    response = []
+    response.append('PASS a:a')
+    return response
+
+
 callback = {'PING': handle_ping,
             '376': connect_to_channels,
-            'PRIVMSG': handle_privmsg
+            'PRIVMSG': handle_privmsg,
+            '464': handle_auth
            }
 
 
@@ -88,7 +97,7 @@ def main():
     """
     s = socket.socket()
     try:
-        s.connect((config['server'], config.getint('port')))
+        s.connect((config['server'], config['port']))
         s.send('USER {} . . :{}\r\n'
                .format(config['username'], config['realname'])
                .encode())
@@ -113,8 +122,5 @@ def main():
 
 
 if __name__ == '__main__':
-    config = ConfigParser()
-    config.read('config.ini')
-    config = config[config.sections()[0]]
-
+    config = config.read_config()['rizon']
     main()
