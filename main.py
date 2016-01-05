@@ -95,15 +95,12 @@ def delegate(text):
 def main():
     """Main
     """
+    config = servers['rizon']
     s = socket.socket()
     try:
         s.connect((config['server'], config['port']))
-        s.send('USER {} . . :{}\r\n'
-               .format(config['username'], config['realname'])
-               .encode())
-        s.send('NICK {}\r\n'
-               .format(config['nickname'])
-               .encode())
+        s.send('USER {username} . . :{realname}\r\n'.format(**config).encode())
+        s.send('NICK {nickname}\r\n'.format(**config).encode())
 
         f = s.makefile()
         while True:
@@ -122,5 +119,6 @@ def main():
 
 
 if __name__ == '__main__':
-    config = config.read_config()['rizon']
+    servers = config.read_config('servers.yaml')
+    plugins = config.read_config('plugins.yaml')
     main()

@@ -3,7 +3,7 @@
 
 import yaml
 
-def read_config(file='config.yaml'):
+def read_config(file):
     """Read a configuration file.
     """
     return yaml.load(open(file))
