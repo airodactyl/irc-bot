@@ -7,3 +7,4 @@ rizon:
     channels:
         - name: "#HorribleSubs"
           plugins: []
+    pass: "insecure_key"  # optional

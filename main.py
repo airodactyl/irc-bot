@@ -1,12 +1,16 @@
 """Main entry point for irc-bot
 """
 
+import logging
 import socket
 import re
 from pprint import pprint
 from collections import namedtuple
 
 import config
+
+logging.basicConfig(filename='log', level=logging.DEBUG)
+log = logging.getLogger('irc-bot')
 
 IRCMessage = namedtuple('IRCMessage', ['prefix', 'command', 'args'])
 MessageHandler = namedtuple('MessageHandler', ['pattern', 'callback'])
@@ -47,7 +51,11 @@ def handle_auth(_):
     """Handle notices.
     """
     response = []
-    response.append('PASS a:a')
+    try:
+        response.append('PASS ' + config['pass'])
+    except KeyError:
+        log.error("Required field 'pass' missing in config block.")
+        raise KeyError
     return response
 
 
@@ -67,7 +75,6 @@ def parse_msg(message):
 
     if message[-1] != '\n':
         print('Message not a full line')
-        pprint(message)
 
     pipeline = message.strip().split(' ', 2)
 
@@ -86,16 +93,15 @@ def delegate(text):
     """Run callbacks depending on the content of the line.
     """
     response = parse_msg(text)
-    try:
+    if response.command in callback:
         return callback[response.command](response)
-    except KeyError:
+    else:
         return []
 
 
 def main():
     """Main
     """
-    config = servers['rizon']
     s = socket.socket()
     try:
         s.connect((config['server'], config['port']))
@@ -105,11 +111,11 @@ def main():
         f = s.makefile()
         while True:
             line = f.readline()
-            print(repr(line), file=open('log', 'a'))
+            log.debug("<< {}".format(line.strip()))
             responses = delegate(line)
             if responses:
                 for response in responses:
-                    print(">>>>> {}".format(response), file=open('log', 'a'))
+                    log.debug(">> {}".format(response))
                     s.send((response + '\r\n').encode())
 
     except KeyboardInterrupt:
@@ -121,4 +127,5 @@ def main():
 if __name__ == '__main__':
     servers = config.read_config('servers.yaml')
     plugins = config.read_config('plugins.yaml')
+    config = servers['rizon']
     main()
