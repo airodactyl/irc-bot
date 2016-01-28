@@ -2,21 +2,36 @@
 """
 
 import logging
+import os.path
 import socket
 import re
+import traceback
 from pprint import pprint
 from collections import namedtuple
+from importlib import import_module, reload
+from glob import glob
 
 import config
 
-logging.basicConfig(filename='log', level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger('irc-bot')
 
 IRCMessage = namedtuple('IRCMessage', ['prefix', 'command', 'args'])
-MessageHandler = namedtuple('MessageHandler', ['pattern', 'callback'])
-
+PrivMessage = namedtuple('PrivMessage', ['sender', 'target', 'contents',
+                                         'private'])
 
 message_handlers = []  #: list of MessageHandler objects
+plugin_modules = {}
+
+def get_plugin_callbacks():
+    """Return a list of all plugin callbacks.
+    """
+    for pkg in plugin_modules.values():
+        reload(pkg)
+    for fn in glob('plugins/*.py'):
+        pkg = import_module('plugins.' + os.path.basename(os.path.splitext(fn)[0]))
+        plugin_modules[pkg.__name__] = pkg
+    return [pkg.callback for pkg in plugin_modules.values()]
 
 
 def handle_ping(msg):
@@ -41,9 +56,15 @@ def handle_privmsg(msg):
     target, contents = msg.args.split(' ', 1)
     if contents[0] == ':':
         contents = contents[1:]
-    for handler in message_handlers:
-        if re.match(handler.pattern, contents):
-            response.append(handler.callback(contents))
+    msg = PrivMessage(msg.prefix, target, contents, target == config['nickname'])
+    print(msg)
+    for fn in get_plugin_callbacks():
+        try:
+            result = fn(msg)
+            if result:
+                response.append(result)
+        except Exception as x:
+            traceback.print_tb(x.__traceback__)
     return response
 
 
@@ -80,6 +101,7 @@ def parse_msg(message):
 
     if pipeline[0][0] == ':':
         prefix = pipeline.pop(0)
+        prefix = prefix[1:] if prefix[0] == ':' else prefix
 
     command = pipeline.pop(0)
 
@@ -111,11 +133,11 @@ def main():
         f = s.makefile()
         while True:
             line = f.readline()
-            log.debug("<< {}".format(line.strip()))
+            log.debug("<-- {}".format(line.strip()))
             responses = delegate(line)
             if responses:
                 for response in responses:
-                    log.debug(">> {}".format(response))
+                    log.debug("--> {}".format(response))
                     s.send((response + '\r\n').encode())
 
     except KeyboardInterrupt:
